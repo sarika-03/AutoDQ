@@ -1,3 +1,8 @@
 openmetadata-docker/docker-volume/
 *.log
 .DS_Store
+
+.env
+.venv
+docker-volume
+__pycache__
