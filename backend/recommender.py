@@ -11,13 +11,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-import anthropic
+import groq
 
 from om_client import ColumnProfile, TableProfile, TestDefinition, ExistingTest
 
 logger = logging.getLogger(__name__)
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+GROQ_MODEL = "llama3-70b-8192"
 
 
 # ---------------------------------------------------------------------------
@@ -201,22 +201,22 @@ def _parse_response(raw: str, definitions: list[TestDefinition]) -> list[TestRec
 
 class DQRecommender:
     """
-    Uses Claude to analyze a TableProfile and return TestRecommendations.
+    Uses Groq to analyze a TableProfile and return TestRecommendations.
 
     Usage:
         recommender = DQRecommender.from_env()
         recommendations = recommender.recommend(table_profile, test_definitions, existing_tests)
     """
 
-    def __init__(self, api_key: str, model: str = CLAUDE_MODEL, max_tokens: int = 4096):
-        self.client = anthropic.Anthropic(api_key=api_key)
+    def __init__(self, api_key: str, model: str = GROQ_MODEL, max_tokens: int = 4096):
+        self.client = groq.Groq(api_key=api_key)
         self.model = model
         self.max_tokens = max_tokens
 
     @classmethod
     def from_env(cls) -> "DQRecommender":
-        api_key = os.environ["ANTHROPIC_API_KEY"]
-        model = os.environ.get("CLAUDE_MODEL", CLAUDE_MODEL)
+        api_key = os.environ["GROQ_API_KEY"]
+        model = os.environ.get("GROQ_MODEL", GROQ_MODEL)
         return cls(api_key=api_key, model=model)
 
     def recommend(
@@ -237,17 +237,20 @@ class DQRecommender:
 
         prompt = _build_user_prompt(table, definitions, existing_tests)
 
-        logger.info("Sending profile for %s to Claude (%d columns)...",
+        logger.info("Sending profile for %s to Groq (%d columns)...",
                     table.fqn, len(table.columns))
 
-        message = self.client.messages.create(
+        message = self.client.chat.completions.create(
             model=self.model,
             max_tokens=self.max_tokens,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0
         )
 
-        raw_response = message.content[0].text
+        raw_response = message.choices[0].message.content
         logger.debug("Raw LLM response:\n%s", raw_response)
 
         recommendations = _parse_response(raw_response, definitions)
