@@ -1,4 +1,5 @@
 openmetadata-docker/docker-volume/
+.env
 *.log
 .DS_Store
 
